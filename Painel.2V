@@ -198,4 +198,8 @@ local ok=cp(h2..table.concat(L,"\n"));cb.Text=ok and"[OK] Copiado!"or"[C] Ctrl+C
 cb.MouseEnter:Connect(function()T:Create(cb,TweenInfo.new(.15),{BackgroundColor3=C.bg2}):Play()end)
 cb.MouseLeave:Connect(function()T:Create(cb,TweenInfo.new(.15),{BackgroundColor3=C.bg3}):Play()end)
 mn.Size=UDim2.new(0,0,0,0);mn.Position=UDim2.new(.5,0,.5,0)
-T:Create(mn,TweenInfo.new(.35,Enum.EasingStyle.
+T:Create(mn,TweenInfo.new(.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,520,0,440),Position=UDim2.new(.5,-260,.5,-220)}):Play()
+local dg,ds,sp
+hd.InputBegan:Connect(function(ip)if ip.UserInputType==Enum.UserInputType.MouseButton1 or ip.UserInputType==Enum.UserInputType.Touch then dg=true;ds=ip.Position;sp=mn.Position;ip.Changed:Connect(function()if ip.UserInputState==Enum.UserInputState.End then dg=false end end)end end)
+UIS.InputChanged:Connect(function(ip)if dg and(ip.UserInputType==Enum.UserInputType.MouseMovement or ip.UserInputType==Enum.UserInputType.Touch)then local d=ip.Position-ds;mn.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y)end end)
+UIS.InputEnded:Connect(function(ip)if ip.UserInputType==Enum.UserInputType.MouseButton1 or ip.UserInputType==Enum.UserInputType.Touch then dg=false end end)
