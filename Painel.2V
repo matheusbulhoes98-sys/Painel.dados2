@@ -1,0 +1,201 @@
+local G=getgenv and getgenv()or _G;G.LS=G.LS or{hot={},hooksOK=false,err=nil,done=false}
+local CS,P,T,UIS=game:GetService"CollectionService",game:GetService"Players",game:GetService"TweenService",game:GetService"UserInputService"
+local function se(v,d)d=d or 0;if v==nil then return"nil"end;local p=typeof(v)
+if p=="string"then local s=v;if#s>80 then s=s:sub(1,77).."..."end;return string.format("%q",s)end
+if p=="number"then if v~=v or v==math.huge or v==-math.huge then return tostring(v)end;return math.floor(v)==v and tostring(v)or string.format("%.2f",v)end
+if p=="boolean"then return tostring(v)end;if p=="Instance"then return v:GetFullName()end
+if p=="Vector3"then return string.format("V3(%.1f,%.1f,%.1f)",v.X,v.Y,v.Z)end
+if p=="CFrame"then local o=v.Position;return string.format("CF(%.1f,%.1f,%.1f)",o.X,o.Y,o.Z)end
+if p=="Color3"then return string.format("RGB(%d,%d,%d)",(v.R*255+.5)//1,(v.G*255+.5)//1,(v.B*255+.5)//1)end
+if p=="BrickColor"then return"BC("..v.Name..")"end;if p=="EnumItem"then return tostring(v)end
+if p=="function"or p=="thread"then return"<"..p..">"end
+if p=="table"and d<2 then local r,n={},0;for k,x in pairs(v)do n=n+1;if n>5 then r[#r+1]="..."break end;r[#r+1]=tostring(k).."="..se(x,d+1)end;return"{"..table.concat(r,",").."}"end
+return"<"..p..">"end
+local hot=G.LS.hot
+local function bp(k,kd,ex)local e=hot[k];if e then e.n=e.n+1;if ex then e.extra=ex end else hot[k]={n=1,k=kd,extra=ex}end end
+if not G.LS.done then G.LS.done=true;local inH=false
+local TR={FireServer=1,InvokeServer=1,FireAllClients=1,FireClient=1,InvokeClient=1,SetAttribute=1,GetAttribute=1,GetAttributes=1,AddTag=1,RemoveTag=1,HasTag=1,GetTags=1,GetTagged=1,GetDataStore=1,GetGlobalDataStore=1,GetOrderedDataStore=1}
+local function h(s,a,m)if inH or not m or not TR[m]then return end;inH=true
+pcall(function()
+if m=="FireServer"or m=="InvokeServer"then local kd=s:IsA"RemoteFunction"and"RF"or"RE";local q={}
+for i=1,math.min(#a,6)do q[#q+1]=se(a[i])end;local st=#q>0 and table.concat(q,", ")or"";if#a>6 then st=st..", +"..(#a-6)end
+bp(s:GetFullName(),kd,{args=st})
+elseif m=="FireAllClients"or m=="FireClient"then local st=(m=="FireClient")and 2 or 1;local q={}
+for i=st,math.min(#a,st+5)do q[#q+1]=se(a[i])end;bp(s:GetFullName().." ["..m.."]","RE",{args=table.concat(q,", ")})
+elseif m=="InvokeClient"then local q={}for i=2,math.min(#a,6)do q[#q+1]=se(a[i])end;bp(s:GetFullName().." [IC]","RF",{args=table.concat(q,", ")})
+elseif m=="SetAttribute"or m=="GetAttribute"then local nm=tostring(a[1]);local ex={name=nm};if m=="SetAttribute"then ex.value=se(a[2])end;bp(s:GetFullName().."."..nm,"ATTR",ex)
+elseif m=="GetAttributes"then bp(s:GetFullName()..".<all>","ATTR",{name="<all>"})
+elseif m=="AddTag"or m=="RemoveTag"or m=="HasTag"then local n=a[1];local tg=a[2];local tn=(typeof(n)=="Instance")and n:GetFullName()or tostring(n);bp("CS "..tn.." ["..tostring(tg).."]","CS",{tag=tostring(tg)})
+elseif m=="GetTags"then local n=a[1];local tn=(typeof(n)=="Instance")and n:GetFullName()or tostring(n);bp("CS GetTags "..tn,"CS",{})
+elseif m=="GetTagged"then bp("CS GetTagged("..tostring(a[1])..")","CS",{tag=tostring(a[1])})
+elseif m=="GetDataStore"or m=="GetGlobalDataStore"or m=="GetOrderedDataStore"then bp("DSS "..tostring(a[1]),"DSS",{name=tostring(a[1]),method=m})end
+end)
+inH=false end
+
+-- ===== HOOK MASCARADO (anti-detect) =====
+local ok,er=false,nil
+if hookmetamethod and newcclosure then
+    ok,er=pcall(function()
+        local old_nc
+        old_nc = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+            local args = {...}
+            local method = getnamecallmethod()
+            if not inH then
+                inH = true
+                pcall(function() h(self, args, method) end)
+                inH = false
+            end
+            return old_nc(self, ...)
+        end))
+        if debug and debug.setinfo then
+            pcall(function()
+                debug.setinfo(old_nc, {
+                    name = "namecall",
+                    what = "C",
+                    source = "[C]",
+                    short_src = "[C]",
+                    currentline = -1
+                })
+            end)
+        end
+    end)
+end
+if not ok and getrawmetatable and hookfunction and newcclosure then
+    ok,er=pcall(function()
+        local mt=getrawmetatable(game)
+        local old_nc=mt.__namecall
+        setreadonly(mt,false)
+        mt.__namecall=newcclosure(function(self,...)
+            local args=table.pack(...)
+            local method
+            pcall(function() method=getnamecallmethod() end)
+            if not inH then
+                inH = true
+                pcall(function() h(self,args,method) end)
+                inH = false
+            end
+            return old_nc(self,...)
+        end)
+        setreadonly(mt,true)
+    end)
+end
+G.LS.hooksOK=ok
+if not ok then G.LS.err=tostring(er) end end
+
+local plr=P.LocalPlayer;local pg=plr:WaitForChild"PlayerGui"
+local o=pg:FindFirstChild"LogScannerPanel";if o then o:Destroy()end
+local C={bg=Color3.fromRGB(20,20,28),bg2=Color3.fromRGB(30,30,42),bg3=Color3.fromRGB(38,38,52),a=Color3.fromRGB(88,130,255),a2=Color3.fromRGB(56,96,220),t=Color3.fromRGB(230,232,240),d=Color3.fromRGB(150,152,170),g=Color3.fromRGB(80,220,140),y=Color3.fromRGB(240,200,90),r=Color3.fromRGB(240,100,100)}
+local function N(c,p,par)local i=Instance.new(c);for k,v in pairs(p)do i[k]=v end;if par then i.Parent=par end;return i end
+local function cn(r)return{CornerRadius=UDim.new(0,r)}end
+local gui=N("ScreenGui",{Name="LogScannerPanel",ResetOnSpawn=false,IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
+local mn=N("Frame",{Size=UDim2.new(0,520,0,440),Position=UDim2.new(.5,-260,.5,-220),BackgroundColor3=C.bg,BorderSizePixel=0},gui)
+N("UICorner",cn(12),mn);N("UIStroke",{Color=C.a,Thickness=1.2,Transparency=.4},mn)
+local hd=N("Frame",{Size=UDim2.new(1,0,0,42),BackgroundColor3=C.bg2,BorderSizePixel=0},mn)
+N("UICorner",cn(12),hd);N("Frame",{Size=UDim2.new(1,0,0,12),Position=UDim2.new(0,0,1,-12),BackgroundColor3=C.bg2,BorderSizePixel=0},hd)
+N("TextLabel",{Text="  [LOG]  Log Scanner v2",Size=UDim2.new(1,-140,1,0),BackgroundTransparency=1,TextColor3=C.t,Font=Enum.Font.GothamBold,TextSize=16,TextXAlignment=Enum.TextXAlignment.Left},hd)
+local st=N("TextLabel",{Text="* PRONTO",Size=UDim2.new(0,130,1,0),Position=UDim2.new(1,-140,0,0),BackgroundTransparency=1,TextColor3=C.g,Font=Enum.Font.GothamBold,TextSize=12,TextXAlignment=Enum.TextXAlignment.Right},hd)
+local tf=N("Frame",{Size=UDim2.new(1,-20,0,32),Position=UDim2.new(0,10,0,50),BackgroundColor3=C.bg2,BorderSizePixel=0},mn)
+N("UICorner",cn(8),tf);N("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,3),HorizontalAlignment=Enum.HorizontalAlignment.Center,VerticalAlignment=Enum.VerticalAlignment.Center},tf);N("UIPadding",{PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,3)},tf)
+local TN={"RemoteEvent","RemoteFunction","Attributes","CollectionService","DataStoreService","CO"}
+local TS={RemoteEvent="RE",RemoteFunction="RF",Attributes="ATTR",CollectionService="CS",DataStoreService="DSS",CO="CO"}
+local cur="RemoteEvent";local tb={};local data={};local sn={};local sl={}
+for _,n in ipairs(TN)do data[n]={};sn[n]={};sl[n]={}end
+for _,n in ipairs(TN)do local b=N("TextButton",{Text=TS[n],Size=UDim2.new(.16,0,1,-6),BackgroundColor3=(n==cur)and C.a or C.bg3,TextColor3=(n==cur)and Color3.new(1,1,1)or C.d,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0,AutoButtonColor=false,TextTruncate=Enum.TextTruncate.AtEnd},tf);N("UICorner",cn(6),b);tb[n]=b end
+local fr=N("Frame",{Size=UDim2.new(1,-20,0,28),Position=UDim2.new(0,10,0,90),BackgroundTransparency=1},mn);N("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,6)},fr)
+local ft=N("TextBox",{Size=UDim2.new(.75,-3,1,0),BackgroundColor3=C.bg2,BorderSizePixel=0,Text="",PlaceholderText="[F] Filtrar...",PlaceholderColor3=C.d,TextColor3=C.t,Font=Enum.Font.Gotham,TextSize=13,TextXAlignment=Enum.TextXAlignment.Left,ClearTextOnFocus=false},fr)
+N("UICorner",cn(6),ft);N("UIPadding",{PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8)},ft)
+local lb=N("TextButton",{Size=UDim2.new(.25,-3,1,0),BackgroundColor3=C.bg3,TextColor3=C.d,Text="[LIVE] OFF",Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0,AutoButtonColor=false},fr);N("UICorner",cn(6),lb)
+local ct=N("ScrollingFrame",{Size=UDim2.new(1,-20,0,250),Position=UDim2.new(0,10,0,126),BackgroundColor3=C.bg2,BorderSizePixel=0,CanvasSize=UDim2.new(0,0,0,0),ScrollBarThickness=4,ScrollBarImageColor3=C.a},mn)
+N("UICorner",cn(8),ct);N("UIListLayout",{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder},ct);N("UIPadding",{PaddingTop=UDim.new(0,6),PaddingBottom=UDim.new(0,6),PaddingLeft=UDim.new(0,6),PaddingRight=UDim.new(0,6)},ct)
+local bt=N("Frame",{Size=UDim2.new(1,-20,0,42),Position=UDim2.new(0,10,1,-52),BackgroundTransparency=1},mn)
+N("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,8),VerticalAlignment=Enum.VerticalAlignment.Center},bt)
+local sb=N("TextButton",{Text="> ESCANEAR",Size=UDim2.new(.5,-4,1,0),BackgroundColor3=C.a,TextColor3=Color3.new(1,1,1),Font=Enum.Font.GothamBold,TextSize=14,BorderSizePixel=0,AutoButtonColor=false},bt);N("UICorner",cn(8),sb)
+local cb=N("TextButton",{Text="[COPY] COPIAR",Size=UDim2.new(.5,-4,1,0),BackgroundColor3=C.bg3,TextColor3=C.t,Font=Enum.Font.GothamBold,TextSize=14,BorderSizePixel=0,AutoButtonColor=false},bt);N("UICorner",cn(8),cb)
+local pr=N("Frame",{Size=UDim2.new(0,340,0,100),Position=UDim2.new(.5,-170,.5,-50),BackgroundColor3=C.bg,BorderSizePixel=0,Visible=false,ZIndex=30},gui)
+N("UICorner",cn(10),pr);N("UIStroke",{Color=C.a,Thickness=1.5},pr)
+local pT=N("TextLabel",{Text="Preparando...",Size=UDim2.new(1,-20,0,24),Position=UDim2.new(0,10,0,8),BackgroundTransparency=1,TextColor3=C.t,Font=Enum.Font.GothamBold,TextSize=14,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=31},pr)
+local pB=N("Frame",{Size=UDim2.new(1,-20,0,10),Position=UDim2.new(0,10,0,42),BackgroundColor3=C.bg3,BorderSizePixel=0,ZIndex=31},pr);N("UICorner",cn(5),pB)
+local pF=N("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=C.a,BorderSizePixel=0,ZIndex=32},pB);N("UICorner",cn(5),pF)
+local pL=N("TextLabel",{Text="0 / 0",Size=UDim2.new(1,-20,0,20),Position=UDim2.new(0,10,0,60),BackgroundTransparency=1,TextColor3=C.d,Font=Enum.Font.Gotham,TextSize=12,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=31},pr)
+local bk=N("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.new(0,0,0),BackgroundTransparency=.4,Text="",AutoButtonColor=false,Visible=false,ZIndex=20},gui)
+local function ck(t)return t:match("^(.-)%s+::")or t end
+local function lk(t)if cur=="CO"then return ck(t)end;return t end
+local function sc()local c=0;for _ in pairs(sl[cur]or{})do c=c+1 end;return c end
+local function uc()local c=sc();cb.Text=(c>0)and("[COPY] "..c.." SELEC.")or"[COPY] COPIAR"end
+local function cl()for _,x in ipairs(ct:GetChildren())do if x:IsA"TextButton"or x:IsA"TextLabel"then x:Destroy()end end end
+local function fm(t,tab)if(tab=="RemoteEvent"or tab=="RemoteFunction")and hot[t]then local x=hot[t];local ap="";if x.extra and x.extra.args and x.extra.args~=""then local s=x.extra.args;if#s>46 then s=s:sub(1,43).."..."end;ap="  <- "..s end;return t.."  ["..x.n.."x]"..ap end;return t end
+local function mk(dt,an,ky)
+if string.sub(dt,1,3)=="==="then N("TextLabel",{Size=UDim2.new(1,0,0,18),BackgroundTransparency=1,Text="  "..dt,TextColor3=C.a,Font=Enum.Font.GothamBold,TextSize=11,TextXAlignment=Enum.TextXAlignment.Left},ct);return end
+local r=N("TextButton",{Size=UDim2.new(1,0,0,22),BackgroundColor3=C.bg3,BackgroundTransparency=an and 1 or .4,BorderSizePixel=0,Text="  "..dt,TextColor3=C.t,Font=Enum.Font.Code,TextSize=12,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,TextTransparency=an and 1 or 0,AutoButtonColor=false},ct)
+N("UICorner",cn(4),r);N("UIPadding",{PaddingLeft=UDim.new(0,4)},r)
+local function pt(on)if on then r.BackgroundColor3=C.g;r.BackgroundTransparency=.5;r.TextColor3=Color3.new(1,1,1)else r.BackgroundColor3=C.bg3;r.BackgroundTransparency=.4;r.TextColor3=C.t end end
+if sl[cur][ky]then pt(true)end
+r.MouseButton1Click:Connect(function()if sl[cur][ky]then sl[cur][ky]=nil;pt(false)else sl[cur][ky]=true;pt(true)end;uc()end)
+if an then T:Create(r,TweenInfo.new(.25),{TextTransparency=0,BackgroundTransparency=.4}):Play()end;return r end
+local function rc(c)c=c or#data[cur];ct.CanvasSize=UDim2.new(0,0,0,c*24+12)end
+local function s2()ct.CanvasPosition=Vector2.new(0,math.max(0,ct.CanvasSize.Y.Offset-ct.AbsoluteWindowSize.Y))end
+local function fl()local q=ft.Text;if q==""then return data[cur]end;local ql=string.lower(q);local o={};for _,i in ipairs(data[cur])do if string.find(string.lower(i),ql,1,true)then o[#o+1]=i end end;return o end
+local function rd()cl();local l=fl();for _,rw in ipairs(l)do mk(fm(rw,cur),false,lk(rw))end;rc(#l);uc()end
+local function sw(n)cur=n;for k,b in pairs(tb)do if k==n then b.BackgroundColor3=C.a;b.TextColor3=Color3.new(1,1,1)else b.BackgroundColor3=C.bg3;b.TextColor3=C.d end end;rd()end
+for k,b in pairs(tb)do b.MouseButton1Click:Connect(function()sw(k)end);b.MouseEnter:Connect(function()if k~=cur then T:Create(b,TweenInfo.new(.15),{BackgroundColor3=C.bg2}):Play()end end);b.MouseLeave:Connect(function()if k~=cur then T:Create(b,TweenInfo.new(.15),{BackgroundColor3=C.bg3}):Play()end end)end
+local fc;ft:GetPropertyChangedSignal"Text":Connect(function()if fc then task.cancel(fc)end;fc=task.delay(.15,function()if ft.Text~=""and#data[cur]==0 then return end;rd()end)end)
+local function ul(n)local b=tb[n];if not b then return end;local c=#data[n];b.Text=(c>0)and(TS[n].." ("..c..")")or TS[n]end
+local function al(n,tx)if sn[n][tx]then return end;sn[n][tx]=true;table.insert(data[n],tx);ul(n);if cur==n then local q=ft.Text;if q==""or string.find(string.lower(tx),string.lower(q),1,true)then mk(fm(tx,n),true,lk(tx));rc();s2()end end end
+local scn=false
+local function ss(t,c)st.Text="* "..t;st.TextColor3=c end
+local function gp(p)if not p or not p.Character then return nil end;local h1=p.Character:FindFirstChild"HumanoidRootPart";local e=p.Character:FindFirstChild"Head";local r=h1 or e;if r then return r.Position end;local ok,ps=pcall(function()return p.Character:GetPivot().Position end);if ok then return ps end;return nil end
+local function fp(v)if not v then return"?"end;return string.format("X=%.1f Y=%.1f Z=%.1f",v.X,v.Y,v.Z)end
+local function bc()local L={};for _,p in ipairs(P:GetPlayers())do local ps=gp(p);local tg=(p==plr)and" [VOCE]"or"";L[#L+1]=p.Name..tg.."  ::  "..fp(ps)end;L[#L+1]="=== MAIS USADOS (HOT) ==="
+if not G.LS.hooksOK then L[#L+1]="[!] Hook: "..tostring(G.LS.err or"erro")else local ar={};for k,v in pairs(hot)do ar[#ar+1]={k=k,n=v.n,t=v.k,ex=v.extra}end;table.sort(ar,function(a,b)return a.n>b.n end);local tp=math.min(#ar,15)
+if tp==0 then L[#L+1]="[!] Nada detectado - interaja com o jogo"else for i=1,tp do local e=ar[i];local dt="";if e.ex then if e.ex.args and e.ex.args~=""then local s=e.ex.args;if#s>42 then s=s:sub(1,39).."..."end;dt="  <- "..s elseif e.ex.value then dt=" = "..e.ex.value elseif e.ex.tag then dt="  ["..e.ex.tag.."]"end end;L[#L+1]="HOT #"..i.."  "..e.t.."  "..e.k.."  ("..e.n.."x)"..dt end end end;return L end
+local function sC(L)data.CO=L;sn.CO={};for _,i in ipairs(L)do sn.CO[i]=true end;ul"CO"end
+local lv=false;local lt=0
+local function slb(on)if on then lb.Text="[LIVE] ON";lb.BackgroundColor3=C.g;lb.TextColor3=Color3.new(1,1,1)else lb.Text="[LIVE] OFF";lb.BackgroundColor3=C.bg3;lb.TextColor3=C.d end end
+slb(false)
+local function tk()if cur~="CO"then return end;sC(bc());local s=ct.CanvasPosition;rd();ct.CanvasPosition=s end
+local function sv()lt=lt+1;local my=lt;lv=true;slb(true);task.spawn(function()while lv and lt==my do task.wait(.2);if lv and lt==my and cur=="CO"then tk()end end end)end
+local function pv()lv=false;lt=lt+1;slb(false)end
+lb.MouseButton1Click:Connect(function()if lv then pv()else sv()end end)
+lb.MouseEnter:Connect(function()if not lv then T:Create(lb,TweenInfo.new(.15),{BackgroundColor3=C.bg2}):Play()end end)
+lb.MouseLeave:Connect(function()if not lv then T:Create(lb,TweenInfo.new(.15),{BackgroundColor3=C.bg3}):Play()end end)
+local function scan()
+if scn then return end;scn=true;local ws=lv;if ws then pv()end
+for _,n in ipairs(TN)do data[n]={};sn[n]={};sl[n]={};ul(n)end;rd()
+bk.Visible=true;pr.Visible=true;pF.Size=UDim2.new(0,0,1,0);ss("ESCANEANDO",C.y);pT.Text="[*] Coletando...";task.wait(.05)
+local okA,all=pcall(function()return game:GetDescendants()end)
+if not okA then pT.Text="[X] Erro.";ss("ERRO",C.r);task.wait(1.2);pr.Visible=false;bk.Visible=false;scn=false;return end
+local t=#all;if t==0 then pT.Text="[!] Nada.";ss("VAZIO",C.d);task.wait(.8);pr.Visible=false;bk.Visible=false;scn=false;return end
+pL.Text="0 / "..t.."  (0%)";local i=0;local B=150;local ec=0
+while i<t do local be=math.min(i+B,t)
+for j=i+1,be do local ins=all[j];local ok=pcall(function()
+local fn=ins:GetFullName()
+if ins:IsA"RemoteEvent"then al("RemoteEvent",fn)elseif ins:IsA"RemoteFunction"then al("RemoteFunction",fn)end
+local at=ins:GetAttributes();local nk=0;for _ in pairs(at)do nk=nk+1 end
+if nk>0 then local ks={};for aN in pairs(at)do ks[#ks+1]=aN end;table.sort(ks);for _,aN in ipairs(ks)do local aV=at[aN];al("Attributes",fn.."  ::  "..aN.." = "..se(aV).."  :"..typeof(aV))end end
+local okT,tg=pcall(CS.GetTags,CS,ins);if okT and tg and#tg>0 then for _,g in ipairs(tg)do al("CollectionService",g.."  ::  "..fn)end end
+end);if not ok then ec=ec+1 end end
+i=be;local p=i/t;pF.Size=UDim2.new(p,0,1,0);pL.Text=string.format("%d / %d  (%.0f%%)",i,t,p*100);task.wait()end
+table.sort(data.CollectionService)
+do local okD,DSS=pcall(function()return game:GetService"DataStoreService"end)
+al("DataStoreService","=== DataStoreService ===")
+if okD and DSS then al("DataStoreService","Status: API acessivel.")else al("DataStoreService","Status: [X] Indisponivel.")end
+al("DataStoreService","Stores capturados via hook:");local fd=0
+for k,v in pairs(hot)do if v.k=="DSS"then fd=fd+1;al("DataStoreService","  > "..(v.extra and v.extra.name or k).."  ["..(v.extra and v.extra.method or"GetDataStore").."]  ("..v.n.."x)")end end
+if fd==0 then al("DataStoreService","  (nenhum ainda - interaja e escaneie)")end end
+sC(bc());local et=(ec>0)and(" ("..ec.." erros)")or"";pL.Text="[OK] Scan completo! "..t.." instancias"..et;ss("PRONTO",C.g);task.wait(.6)
+pr.Visible=false;bk.Visible=false;scn=false
+for n in pairs(tb)do ul(n)end;rd();if ws then sv()end end
+sb.MouseButton1Click:Connect(scan)
+sb.MouseEnter:Connect(function()if not scn then T:Create(sb,TweenInfo.new(.15),{BackgroundColor3=C.a2}):Play()end end)
+sb.MouseLeave:Connect(function()if not scn then T:Create(sb,TweenInfo.new(.15),{BackgroundColor3=C.a}):Play()end end)
+local function cp(tx)if setclipboard then local ok=pcall(function()setclipboard(tx)end);if ok then return true end end
+local t2=Instance.new"TextBox";t2.Size=UDim2.new(0,0,0,0);t2.Position=UDim2.new(-1,0,-1,0);t2.Text=tx;t2.TextEditable=true;t2.ClearTextOnFocus=false;t2.Parent=gui;t2:CaptureFocus();task.wait(.05);t2:ReleaseFocus();task.delay(2,function()if t2 and t2.Parent then t2:Destroy()end end);return false end
+cb.MouseButton1Click:Connect(function()local L={};local md
+if sc()>0 then for _,i in ipairs(data[cur])do if sl[cur][lk(i)]then L[#L+1]=i end end;md="selecionados"else L=fl();md="todos"end
+if#L==0 then cb.Text="[!] Nada";task.wait(1);uc();return end
+local fa=ft.Text~="";local h2="===== "..cur.." ("..#L.." "..md..(fa and(", filtro: "..ft.Text)or"")..") =====\n"
+local ok=cp(h2..table.concat(L,"\n"));cb.Text=ok and"[OK] Copiado!"or"[C] Ctrl+C";task.wait(1.4);uc()end)
+cb.MouseEnter:Connect(function()T:Create(cb,TweenInfo.new(.15),{BackgroundColor3=C.bg2}):Play()end)
+cb.MouseLeave:Connect(function()T:Create(cb,TweenInfo.new(.15),{BackgroundColor3=C.bg3}):Play()end)
+mn.Size=UDim2.new(0,0,0,0);mn.Position=UDim2.new(.5,0,.5,0)
+T:Create(mn,TweenInfo.new(.35,Enum.EasingStyle.
